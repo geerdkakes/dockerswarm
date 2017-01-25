@@ -1,0 +1,26 @@
+#
+# OpenSSL configuration file.
+#
+ 
+[ req ]
+default_bits				= 2048			# Size of keys
+default_keyfile				= key.pem		# name of generated keys
+distinguished_name			= req_distinguished_name
+req_extensions				= v3_req
+ 
+[ req_distinguished_name ]
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+[alt_names]
+email = noname@nodomain
+dirName = dir_sect
+IP.1 = {{ hostvars[inventory_hostname]['ansible_eth0']['ipv4']['address'] }}
+
+[ dir_sect ]
+C=NL
+O=No Org
+OU=No Unit
+CN=node-0

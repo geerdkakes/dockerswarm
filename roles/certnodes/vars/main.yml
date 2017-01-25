@@ -1,0 +1,9 @@
+# signing server
+signingserver: "{{ groups['masters'][0] }}"
+dockermaster: "{{ groups['masters'][0] }}"
+dockermasterip: "{{ hostvars[dockermaster]['ansible_eth0']['ipv4']['address'] }}"
+
+# directories
+cacertdirectory: /home/ubuntu/docker-ca
+registrycertdir: /etc/registrycerts
+userhomedir: /home/ubuntu

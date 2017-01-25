@@ -1,0 +1,125 @@
+---
+- name: create certificate directory
+  file: path={{ cacertdirectory }} state=directory
+
+- name: create ca certificate
+  command: "{{ item }}"
+  args:
+    creates: "{{ cacertdirectory }}/ca.pem"
+  with_items:
+    - /usr/bin/openssl genrsa -out {{ cacertdirectory }}/ca-key.pem 2048 
+    - /usr/bin/openssl req -x509 -new -key {{ cacertdirectory }}/ca-key.pem -days 365 -out {{ cacertdirectory }}/ca.pem -subj "/CN=docker-ca"
+
+- name: create server certificate
+  command: "{{ item }}"
+  args:
+    creates: "{{ cacertdirectory }}/client.csr"
+  with_items:
+    - /usr/bin/openssl genrsa -out server-key.pem 2046
+    - /usr/bin/openssl req -subj "/CN={{ hostvars[inventory_hostname]['ansible_eth0']['ipv4']['address'] }}" -new -key server-key.pem -out server.csr
+
+- name: copy config to sign certificate
+  template: 
+    src: extfile.cnf.j2
+    dest: "{{ cacertdirectory }}/extfile.cnf"
+    force: yes
+
+- name: sign the server key
+  command: /usr/bin/openssl x509 -req -days 365 -in {{ cacertdirectory }}/server.csr -CA {{ cacertdirectory }}/ca.pem -CAkey {{ cacertdirectory }}/ca-key.pem -CAcreateserial -out {{ cacertdirectory }}/server-cert.pem -extfile {{ cacertdirectory }}/extfile.cnf
+  args:
+    creates: "{{ cacertdirectory }}/server-cert.pem"
+
+- name: create cient key
+  command: /usr/bin/openssl genrsa -out client-key.pem 2048
+  args:
+    creates: "{{ cacertdirectory }}/client-key.pem"
+
+- name: create cient key
+  command: /usr/bin/openssl req -subj '/CN=client' -new -key client-key.pem -out client.csr
+  args:
+    creates: "{{ cacertdirectory }}/client.csr"
+
+- name: copy config to sign certificate
+  template: 
+    src: clientextfile.cnf.j2
+    dest: "{{ cacertdirectory }}/clientextfile.cnf"
+    force: yes
+
+- name: sign the client key
+  command: /usr/bin/openssl x509 -req -days 365 -in {{ cacertdirectory }}/client.csr -CA {{ cacertdirectory }}/ca.pem -CAkey {{ cacertdirectory }}/ca-key.pem -CAcreateserial -out {{ cacertdirectory }}/client-cert.pem -extfile {{ cacertdirectory }}/clientextfile.cnf 
+  args:
+    creates: "{{ cacertdirectory }}/client-cert.pem"
+
+- name: set CA key access rights
+  file:
+    path: "{{ item }}"
+    mode: 0400
+  with_items:
+    - "{{ cacertdirectory }}/ca-key.pem"
+    - "{{ cacertdirectory }}/client-key.pem"
+    - "{{ cacertdirectory }}/server-key.pem"
+    
+
+- name: set cert key access rights
+  file:
+    path: "{{ item }}"
+    mode: 0444
+  with_items:
+    - "{{ cacertdirectory }}/ca.pem"
+    - "{{ cacertdirectory }}/server-cert.pem"
+    - "{{ cacertdirectory }}/client-cert.pem"
+    
+
+- name: create certificate directory
+  become: true
+  file: path={{ cacertdirectory }} state=directory
+
+- name: set directory access rights
+  become: true
+  command: "{{ item }}"
+  with_items:
+    - /bin/chown ubuntu:docker /etc/docker
+    - /bin/chmod 700 /etc/docker
+
+- name: copy certificates
+  become: true
+  command: /bin/cp {{ cacertdirectory }}/{ca,server-key,server-cert}.pem /etc/docker
+  args:
+    creates: /etc/docker/server-cert.pem
+
+- name: create certificate directory
+  file: path={{ userhomedir }}/.docker state=directory
+
+- name: create certificate directory
+  become: true
+  file: path={{ registrycertdir }} state=directory
+
+- name: copy config to create signing certificate
+  become: true
+  template: 
+    src: registry.cnf.j2
+    dest: "{{ registrycertdir }}/registry.cnf"
+    force: yes
+
+- name: create registry certificates
+  become: true
+  command: /usr/bin/openssl req -newkey rsa:2048 -nodes -sha256 -keyout {{ registrycertdir }}/domain.key -x509 -days 365 -out {{ registrycertdir }}/domain.crt -config {{ registrycertdir }}/registry.cnf -subj "/"
+  args:
+    creates: "{{ registrycertdir }}/domain.crt"
+
+- name: set registry key access rights
+  become: true
+  file:
+    path: "{{ registrycertdir }}/domain.key"
+    mode: 0400
+
+- name: create certificate directory
+  become: true
+  file: path=/etc/docker/certs.d/{{ hostvars[inventory_hostname]['ansible_eth0']['ipv4']['address'] }}:5000 state=directory
+
+- name: copy registry certificates to correct directory
+  become: true
+  copy:
+    src: "{{ registrycertdir }}/domain.crt"
+    dest: /etc/docker/certs.d/{{ hostvars[inventory_hostname]['ansible_eth0']['ipv4']['address'] }}:5000/ca.crt
+    remote_src: true

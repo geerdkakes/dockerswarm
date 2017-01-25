@@ -1,0 +1,4 @@
+# Certs variables
+cacertdirectory: /home/ubuntu/docker-ca
+registrycertdir: /etc/registrycerts
+userhomedir: /home/ubuntu

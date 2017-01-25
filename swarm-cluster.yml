@@ -1,0 +1,8 @@
+---
+- hosts: firstmaster
+  roles:
+    - certmaster
+
+- hosts: all
+  roles:
+    - certnodes

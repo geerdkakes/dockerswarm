@@ -1,0 +1,45 @@
+---
+- name: create certificate directory
+  file: path={{ userhomedir }}/.docker state=directory
+
+- name: slurp ca certificate
+  slurp: src="{{ cacertdirectory }}/ca.pem"
+  register: ca_certificate
+  run_once: true
+  delegate_to: "{{ signingserver }}"
+
+- name: slurp client key certificate
+  slurp: src="{{ cacertdirectory }}/client-key.pem"
+  register: client_key_certificate
+  run_once: true
+  delegate_to: "{{ signingserver }}"
+
+- name: slurp client certificate
+  slurp: src="{{ cacertdirectory }}/client-cert.pem"
+  register: client_certificate
+  run_once: true
+  delegate_to: "{{ signingserver }}"
+
+- name: write ca certificate to node
+  copy:
+    dest: "{{ userhomedir }}/.docker/ca.pem"
+    content: "{{ ca_certificate.content | b64decode }}"
+    mode: 0644
+
+- name: write client key certificate to node
+  copy:
+    dest: "{{ userhomedir }}/.docker/key.pem"
+    content: "{{ client_key_certificate.content | b64decode }}"
+    mode: 0600
+
+- name: write client key certificate to node
+  copy:
+    dest: "{{ userhomedir }}/.docker/cert.pem"
+    content: "{{ client_certificate.content | b64decode }}"
+    mode: 0644
+
+- name: prep user environment
+  command: "{{ item }}"
+  with_items:
+    - /bin/bash -c '/bin/echo "export DOCKER_HOST=\"tcp://{{ dockermasterip }}:2376\"" >> {{ userhomedir }}/.profile'
+    - /bin/bash -c '/bin/echo "export DOCKER_TLS_VERIFY=1" >> {{ userhomedir }}/.profile'
