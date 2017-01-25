@@ -21,7 +21,7 @@ node0.eu-west-1.compute.amazonaws.com
 ansible_ssh_user=ubuntu
 ansible_python_interpreter=/usr/bin/python
 ```
-Make sure all systems have a public certificate installed for a user which ca su to root.
+Make sure all systems have a public certificate installed for a user which can `su` to root.
 Before running this playbook you can add the private certificate for this user using:
 ```
 ssh-add private-key.pem
